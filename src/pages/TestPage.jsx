@@ -151,18 +151,33 @@ const TestPage = () => {
 
   // Initialize Step 3
   const initializeStep3 = (oid, tid) => {
-    const url = `${config.apiBaseUrl}/api/rest/version/${config.apiVersion}/merchant/${config.merchantId}/order/${oid}/transaction/${tid}`;
+    const url = `${config.apiBaseUrl}/api/rest/version/${config.apiVersion}/merchant/${config.merchantId}/order/${oid}/transaction/one`;
     setStep3Url(url);
 
     const body = {
-      apiOperation: "PAY",
-      authentication: {
-        transactionId: tid
+    "apiOperation": "AUTHORIZE",
+    "authentication": {
+      "transactionId": tid
+    },
+    "sourceOfFunds": {
+      "provided": { 
+        "card": { 
+          "number": "5123450000000008",
+          "expiry": {
+            "month": "01",
+            "year": "39"
+          }
+        }
       },
-      correlationId: generateId('CORR')
-    };
-    setStep3Body(JSON.stringify(body, null, 2));
+      "type": "CARD"
+    },
+    "order": {
+      "currency": "USD",
+      "amount": "100.00"
+    }
   };
+  setStep3Body(JSON.stringify(body, null, 2));
+};
 
   // Regenerate IDs
   const regenerateIds = () => {
