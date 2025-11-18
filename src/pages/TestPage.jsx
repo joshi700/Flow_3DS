@@ -273,7 +273,19 @@ const TestPage = () => {
 
         updateTransaction({
           currentStep: 1,
-          responses: { step1: response.data.data, step2: null, step3: null }
+          responses: { 
+            step1: {
+              ...response.data.data,
+              request: {
+                method: step1Method,
+                url: step1Url,
+                body: JSON.parse(step1Body)
+              }
+            }, 
+            step2: null, 
+            step3: null,
+            step4: null
+          }
         });
       } else {
         throw new Error('Step 1 failed');
@@ -342,8 +354,16 @@ const TestPage = () => {
           currentStep: 2,
           responses: {
             step1: step1Response.data,
-            step2: response.data.data,
-            step3: null
+            step2: {
+              ...response.data.data,
+              request: {
+                method: step2Method,
+                url: step2Url,
+                body: JSON.parse(step2Body)
+              }
+            },
+            step3: null,
+            step4: null
           }
         });
 
@@ -432,7 +452,14 @@ const TestPage = () => {
           responses: {
             step1: step1Response.data,
             step2: step2Response.data,
-            step3: response.data.data
+            step3: {
+              ...response.data.data,
+              request: {
+                method: step3Method,
+                url: step3Url
+              }
+            },
+            step4: null
           }
         });
       } else {
@@ -516,7 +543,14 @@ const TestPage = () => {
             step1: step1Response.data,
             step2: step2Response.data,
             step3: step3Response?.data,
-            step4: response.data.data
+            step4: {
+              ...response.data.data,
+              request: {
+                method: step4Method,
+                url: step4Url,
+                body: JSON.parse(step4Body)
+              }
+            }
           }
         });
 
