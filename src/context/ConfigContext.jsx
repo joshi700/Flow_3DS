@@ -41,12 +41,13 @@ export const ConfigProvider = ({ children }) => {
     orderId: '',
     transactionId: '',
     amount: '',
-    status: 'idle', // idle, step1, step2, step3, completed, error
+    status: 'idle', // idle, step1, step2, step3, step4, completed, error
     currentStep: 0,
     responses: {
       step1: null,
       step2: null,
-      step3: null
+      step3: null,
+      step4: null
     },
     logs: []
   });
@@ -106,7 +107,8 @@ export const ConfigProvider = ({ children }) => {
       responses: {
         step1: null,
         step2: null,
-        step3: null
+        step3: null,
+        step4: null
       },
       logs: []
     });
