@@ -7,7 +7,7 @@ const TestPage = () => {
   const navigate = useNavigate();
   const { config, testCard, updateTransaction, addLog, backendUrl } = useConfig();
 
-  const [loading, setLoading] = useState({ step1: false, step2: false, step3: false });
+  const [loading, setLoading] = useState({ step1: false, step2: false, step3: false, step4: false });
   const [error, setError] = useState(null);
   const [showLogs, setShowLogs] = useState(true);
   const [challengeHtml, setChallengeHtml] = useState(null);
@@ -32,12 +32,17 @@ const TestPage = () => {
   const [step2Response, setStep2Response] = useState(null);
   const [step2BodyError, setStep2BodyError] = useState(null);
 
-  // Step 3 State
-  const [step3Method, setStep3Method] = useState('PUT');
+  // Step 3 State (NEW - Retrieve Order Details)
+  const [step3Method, setStep3Method] = useState('GET');
   const [step3Url, setStep3Url] = useState('');
-  const [step3Body, setStep3Body] = useState('');
   const [step3Response, setStep3Response] = useState(null);
-  const [step3BodyError, setStep3BodyError] = useState(null);
+
+  // Step 4 State (previously Step 3)
+  const [step4Method, setStep4Method] = useState('PUT');
+  const [step4Url, setStep4Url] = useState('');
+  const [step4Body, setStep4Body] = useState('');
+  const [step4Response, setStep4Response] = useState(null);
+  const [step4BodyError, setStep4BodyError] = useState(null);
 
   // Generate unique ID
   const generateId = (prefix) => {
@@ -75,7 +80,8 @@ const TestPage = () => {
 
     initializeStep1(newOrderId, newTransactionId);
     initializeStep2(newOrderId, newTransactionId);
-    initializeStep3(newOrderId, newTransactionId);
+    initializeStep3(newOrderId);
+    initializeStep4(newOrderId, newTransactionId);
 
     addActivityLog('info', `Initialized transaction: ${newOrderId} / ${newTransactionId}`);
   }, []);
@@ -97,7 +103,7 @@ const TestPage = () => {
       sourceOfFunds: {
         provided: {
           card: {
-            number: "5123450000000008"
+            number: testCard.cardNumber
           }
         }
       }
@@ -115,7 +121,7 @@ const TestPage = () => {
       sourceOfFunds: {
         provided: {
           card: {
-            number: "5123450000000008",
+            number: testCard.cardNumber,
             expiry: {
               month: testCard.expiryMonth,
               year: testCard.expiryYear
@@ -124,7 +130,7 @@ const TestPage = () => {
         }
       },
       order: {
-        amount: "100",
+        amount: amount,
         currency: config.currency
       },
       authentication: {
@@ -149,10 +155,16 @@ const TestPage = () => {
     setStep2Body(JSON.stringify(body, null, 2));
   };
 
-  // Initialize Step 3
-  const initializeStep3 = (oid, tid) => {
-    const url = `${config.apiBaseUrl}/api/rest/version/${config.apiVersion}/merchant/${config.merchantId}/order/${oid}/transaction/one`;
+  // Initialize Step 3 (NEW - Retrieve Order Details)
+  const initializeStep3 = (oid) => {
+    const url = `${config.apiBaseUrl}/api/rest/version/${config.apiVersion}/merchant/${config.merchantId}/order/${oid}`;
     setStep3Url(url);
+  };
+
+  // Initialize Step 4 (previously Step 3 - Authorize/Pay)
+  const initializeStep4 = (oid, tid) => {
+    const url = `${config.apiBaseUrl}/api/rest/version/${config.apiVersion}/merchant/${config.merchantId}/order/${oid}/transaction/one`;
+    setStep4Url(url);
 
     const body = {
     "apiOperation": "AUTHORIZE",
@@ -162,21 +174,21 @@ const TestPage = () => {
     "sourceOfFunds": {
       "provided": { 
         "card": { 
-          "number": "5123450000000008",
+          "number": testCard.cardNumber,
           "expiry": {
-            "month": "01",
-            "year": "39"
+            "month": testCard.expiryMonth,
+            "year": testCard.expiryYear
           }
         }
       },
       "type": "CARD"
     },
     "order": {
-      "currency": "USD",
-      "amount": "100.00"
+      "currency": config.currency,
+      "amount": amount
     }
   };
-  setStep3Body(JSON.stringify(body, null, 2));
+  setStep4Body(JSON.stringify(body, null, 2));
 };
 
   // Regenerate IDs
@@ -194,12 +206,14 @@ const TestPage = () => {
 
     initializeStep1(newOrderId, newTransactionId);
     initializeStep2(newOrderId, newTransactionId);
-    initializeStep3(newOrderId, newTransactionId);
+    initializeStep3(newOrderId);
+    initializeStep4(newOrderId, newTransactionId);
 
     // Reset responses
     setStep1Response(null);
     setStep2Response(null);
     setStep3Response(null);
+    setStep4Response(null);
 
     addActivityLog('info', `Regenerated IDs: ${newOrderId} / ${newTransactionId}`);
   };
@@ -376,15 +390,8 @@ const TestPage = () => {
     }
   };
 
-  // Execute Step 3
+  // Execute Step 3 (NEW - Retrieve Order Details)
   const executeStep3 = async () => {
-    const bodyError = validateJSON(step3Body);
-    if (bodyError) {
-      setStep3BodyError(bodyError);
-      return;
-    }
-    setStep3BodyError(null);
-
     if (!step2Response || !step2Response.success) {
       setError('Please complete Step 2 first');
       return;
@@ -392,10 +399,9 @@ const TestPage = () => {
 
     setLoading(prev => ({ ...prev, step3: true }));
     setError(null);
-    addActivityLog('info', 'Starting Step 3: Authorize/Pay');
+    addActivityLog('info', 'Starting Step 3: Retrieve Order Details');
 
     try {
-      // Send the actual edited values from the UI
       const payload = {
         merchantId: config.merchantId,
         username: config.username,
@@ -403,39 +409,25 @@ const TestPage = () => {
         apiBaseUrl: config.apiBaseUrl,
         apiVersion: config.apiVersion,
         orderId: orderId,
-        transactionId: transactionId,
-        method: step3Method,              // ← Use edited method
-        url: step3Url,                    // ← Use edited URL
-        requestBody: step3Body            // ← Use edited request body
+        method: step3Method,
+        url: step3Url
       };
 
-      addActivityLog('info', 'Sending request with custom body to backend');
+      addActivityLog('info', 'Sending GET request to retrieve order details');
 
       const response = await axios.post(
-        `${backendUrl}/api/authorize-pay`,
+        `${backendUrl}/api/retrieve-order`,
         payload,
         { timeout: 30000 }
       );
 
       if (response.data.success) {
         setStep3Response(response.data);
-        const result = response.data.result;
-        const gatewayCode = response.data.gatewayCode;
-
-        if (result === 'SUCCESS' && gatewayCode === 'APPROVED') {
-          addActivityLog('success', '🎉 Payment APPROVED - Step 3 completed successfully', {
-            result,
-            gatewayCode
-          });
-        } else {
-          addActivityLog('warning', `Payment result: ${result}, Gateway code: ${gatewayCode}`, {
-            result,
-            gatewayCode
-          });
-        }
+        addActivityLog('success', 'Step 3 completed - Order details retrieved successfully', {
+          orderStatus: response.data.data?.status
+        });
 
         updateTransaction({
-          status: 'completed',
           currentStep: 3,
           responses: {
             step1: step1Response.data,
@@ -443,9 +435,6 @@ const TestPage = () => {
             step3: response.data.data
           }
         });
-
-        // Navigate to results after delay
-        setTimeout(() => navigate('/results'), 2000);
       } else {
         throw new Error('Step 3 failed');
       }
@@ -459,6 +448,93 @@ const TestPage = () => {
       addActivityLog('error', `Step 3 failed: ${errorMsg}`, err.response?.data);
     } finally {
       setLoading(prev => ({ ...prev, step3: false }));
+    }
+  };
+
+  // Execute Step 4 (previously Step 3 - Authorize/Pay)
+  const executeStep4 = async () => {
+    const bodyError = validateJSON(step4Body);
+    if (bodyError) {
+      setStep4BodyError(bodyError);
+      return;
+    }
+    setStep4BodyError(null);
+
+    if (!step2Response || !step2Response.success) {
+      setError('Please complete Step 2 first');
+      return;
+    }
+
+    setLoading(prev => ({ ...prev, step4: true }));
+    setError(null);
+    addActivityLog('info', 'Starting Step 4: Authorize/Pay');
+
+    try {
+      // Send the actual edited values from the UI
+      const payload = {
+        merchantId: config.merchantId,
+        username: config.username,
+        password: config.password,
+        apiBaseUrl: config.apiBaseUrl,
+        apiVersion: config.apiVersion,
+        orderId: orderId,
+        transactionId: transactionId,
+        method: step4Method,              // ← Use edited method
+        url: step4Url,                    // ← Use edited URL
+        requestBody: step4Body            // ← Use edited request body
+      };
+
+      addActivityLog('info', 'Sending request with custom body to backend');
+
+      const response = await axios.post(
+        `${backendUrl}/api/authorize-pay`,
+        payload,
+        { timeout: 30000 }
+      );
+
+      if (response.data.success) {
+        setStep4Response(response.data);
+        const result = response.data.result;
+        const gatewayCode = response.data.gatewayCode;
+
+        if (result === 'SUCCESS' && gatewayCode === 'APPROVED') {
+          addActivityLog('success', '🎉 Payment APPROVED - Step 4 completed successfully', {
+            result,
+            gatewayCode
+          });
+        } else {
+          addActivityLog('warning', `Payment result: ${result}, Gateway code: ${gatewayCode}`, {
+            result,
+            gatewayCode
+          });
+        }
+
+        updateTransaction({
+          status: 'completed',
+          currentStep: 4,
+          responses: {
+            step1: step1Response.data,
+            step2: step2Response.data,
+            step3: step3Response?.data,
+            step4: response.data.data
+          }
+        });
+
+        // Navigate to results after delay
+        setTimeout(() => navigate('/results'), 2000);
+      } else {
+        throw new Error('Step 4 failed');
+      }
+    } catch (err) {
+      console.error('Step 4 error:', err);
+      const errorMsg = err.response?.data?.details?.explanation ||
+                       err.response?.data?.error ||
+                       err.message;
+      setError(`Step 4 Error: ${errorMsg}`);
+      setStep4Response(err.response?.data || { error: err.message });
+      addActivityLog('error', `Step 4 failed: ${errorMsg}`, err.response?.data);
+    } finally {
+      setLoading(prev => ({ ...prev, step4: false }));
     }
   };
 
@@ -478,10 +554,16 @@ const TestPage = () => {
   };
 
   const resetStep3 = () => {
-    initializeStep3(orderId, transactionId);
+    initializeStep3(orderId);
     setStep3Response(null);
-    setStep3BodyError(null);
     addActivityLog('info', 'Step 3 reset to default values');
+  };
+
+  const resetStep4 = () => {
+    initializeStep4(orderId, transactionId);
+    setStep4Response(null);
+    setStep4BodyError(null);
+    addActivityLog('info', 'Step 4 reset to default values');
   };
 
   return (
@@ -571,8 +653,7 @@ const TestPage = () => {
                 <button
                   onClick={() => {
                     setChallengeHtml(null);
-                    addActivityLog('info', '3DS challenge completed - proceeding to Step 3');
-                    setTimeout(() => executeStep3(), 1000);
+                    addActivityLog('info', '3DS challenge completed - you can now proceed to next steps');
                   }}
                   className="btn-primary"
                 >
@@ -719,11 +800,12 @@ const TestPage = () => {
           </div>
         </div>
 
-        {/* Step 3: Authorize/Pay */}
+        {/* Step 3: Retrieve Order Details (NEW) */}
         <div className="card mb-6">
           <div className="flex items-center gap-3 mb-4">
             <div className={`step-indicator ${step3Response?.success ? 'completed' : step2Response?.success ? 'active' : 'pending'}`}>3</div>
-            <h2 className="text-xl font-bold text-gray-900">Step 3: Authorize/Pay</h2>
+            <h2 className="text-xl font-bold text-gray-900">Step 3: Retrieve Order Details</h2>
+            <span className="text-sm text-gray-500 italic">(Optional)</span>
           </div>
 
           {/* Method & URL */}
@@ -733,7 +815,7 @@ const TestPage = () => {
               value={step3Method}
               onChange={(e) => setStep3Method(e.target.value.toUpperCase())}
               className="px-4 py-2 border border-gray-300 rounded-lg font-semibold bg-white w-24 text-center"
-              placeholder="PUT"
+              placeholder="GET"
             />
             <input
               type="text"
@@ -744,20 +826,11 @@ const TestPage = () => {
             />
           </div>
 
-          {/* Request Body */}
-          <div className="mb-4">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Request Body</label>
-            <textarea
-              value={step3Body}
-              onChange={(e) => {
-                setStep3Body(e.target.value);
-                setStep3BodyError(validateJSON(e.target.value));
-              }}
-              className={`w-full h-64 px-4 py-2 border ${step3BodyError ? 'border-error-500' : 'border-gray-300'} rounded-lg font-mono text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent`}
-            />
-            {step3BodyError && (
-              <p className="text-xs text-error-600 mt-1">❌ Invalid JSON: {step3BodyError}</p>
-            )}
+          {/* Info Note */}
+          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              ℹ️ This step retrieves the current order status. No request body needed for GET request.
+            </p>
           </div>
 
           {/* Response */}
@@ -779,10 +852,78 @@ const TestPage = () => {
             </button>
             <button
               onClick={executeStep3}
-              disabled={loading.step3 || !step2Response?.success || step3BodyError}
+              disabled={loading.step3 || !step2Response?.success}
               className="btn-primary flex-1"
             >
               {loading.step3 ? '⏳ Executing...' : '🚀 Execute Step 3'}
+            </button>
+          </div>
+        </div>
+
+        {/* Step 4: Authorize/Pay (previously Step 3) */}
+        <div className="card mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`step-indicator ${step4Response?.success ? 'completed' : step2Response?.success ? 'active' : 'pending'}`}>4</div>
+            <h2 className="text-xl font-bold text-gray-900">Step 4: Authorize/Pay</h2>
+          </div>
+
+          {/* Method & URL */}
+          <div className="flex gap-2 mb-4">
+            <input
+              type="text"
+              value={step4Method}
+              onChange={(e) => setStep4Method(e.target.value.toUpperCase())}
+              className="px-4 py-2 border border-gray-300 rounded-lg font-semibold bg-white w-24 text-center"
+              placeholder="PUT"
+            />
+            <input
+              type="text"
+              value={step4Url}
+              onChange={(e) => setStep4Url(e.target.value)}
+              className="input-field flex-1 font-mono text-sm"
+              placeholder="API URL"
+            />
+          </div>
+
+          {/* Request Body */}
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Request Body</label>
+            <textarea
+              value={step4Body}
+              onChange={(e) => {
+                setStep4Body(e.target.value);
+                setStep4BodyError(validateJSON(e.target.value));
+              }}
+              className={`w-full h-64 px-4 py-2 border ${step4BodyError ? 'border-error-500' : 'border-gray-300'} rounded-lg font-mono text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent`}
+            />
+            {step4BodyError && (
+              <p className="text-xs text-error-600 mt-1">❌ Invalid JSON: {step4BodyError}</p>
+            )}
+          </div>
+
+          {/* Response */}
+          {step4Response && (
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Response {step4Response.success ? '✅' : '❌'}
+              </label>
+              <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto text-xs font-mono max-h-64 overflow-y-auto border border-gray-200">
+                {JSON.stringify(step4Response, null, 2)}
+              </pre>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-3">
+            <button onClick={resetStep4} className="btn-secondary">
+              🔄 Reset to Default
+            </button>
+            <button
+              onClick={executeStep4}
+              disabled={loading.step4 || !step2Response?.success || step4BodyError}
+              className="btn-primary flex-1"
+            >
+              {loading.step4 ? '⏳ Executing...' : '🚀 Execute Step 4'}
             </button>
           </div>
         </div>
@@ -848,7 +989,7 @@ const TestPage = () => {
           >
             ← Settings
           </button>
-          {step3Response?.success && (
+          {step4Response?.success && (
             <button
               onClick={() => navigate('/results')}
               className="btn-primary"
