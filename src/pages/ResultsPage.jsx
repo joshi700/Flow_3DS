@@ -6,6 +6,7 @@ const ResultsPage = () => {
   const navigate = useNavigate();
   const { transaction, resetTransaction } = useConfig();
   const [expandedStep, setExpandedStep] = useState(null);
+  const [showRequestData, setShowRequestData] = useState({});
 
   const handleNewTest = () => {
     resetTransaction();
@@ -28,6 +29,13 @@ const ResultsPage = () => {
     return JSON.stringify(data, null, 2);
   };
 
+  const toggleRequestResponse = (step) => {
+    setShowRequestData(prev => ({
+      ...prev,
+      [step]: !prev[step]
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8 px-4">
       <div className="max-w-6xl mx-auto">
@@ -43,24 +51,24 @@ const ResultsPage = () => {
 
         {/* Overall Status */}
         <div className={`card mb-6 ${
-          transaction.responses.step3?.result === 'SUCCESS'
+          transaction.responses.step4?.result === 'SUCCESS'
             ? 'bg-gradient-to-r from-success-50 to-green-50 border-success-200'
             : 'bg-gradient-to-r from-error-50 to-red-50 border-error-200'
         }`}>
           <div className="flex items-center gap-4">
             <div className="text-6xl">
-              {getResultIcon(transaction.responses.step3?.result)}
+              {getResultIcon(transaction.responses.step4?.result)}
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                {transaction.responses.step3?.result === 'SUCCESS' 
+                {transaction.responses.step4?.result === 'SUCCESS' 
                   ? 'Payment Successful!' 
                   : 'Payment Failed'}
               </h2>
               <p className="text-lg font-semibold">
                 Gateway Code:{' '}
-                <span className={getGatewayCodeColor(transaction.responses.step3?.response?.gatewayCode)}>
-                  {transaction.responses.step3?.response?.gatewayCode || 'N/A'}
+                <span className={getGatewayCodeColor(transaction.responses.step4?.response?.gatewayCode)}>
+                  {transaction.responses.step4?.response?.gatewayCode || 'N/A'}
                 </span>
               </p>
               <p className="text-sm text-gray-600 mt-1">
@@ -93,13 +101,13 @@ const ResultsPage = () => {
             <div>
               <p className="text-sm text-gray-600">Payment Result</p>
               <p className="text-lg font-bold text-gray-900">
-                {transaction.responses.step3?.result || 'N/A'}
+                {transaction.responses.step4?.result || 'N/A'}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Total Steps</p>
               <p className="text-lg font-bold text-gray-900">
-                {Object.values(transaction.responses).filter(r => r !== null).length} / 3
+                {Object.values(transaction.responses).filter(r => r !== null).length} / 4
               </p>
             </div>
           </div>
@@ -133,11 +141,50 @@ const ResultsPage = () => {
               </div>
 
               {expandedStep === 1 && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-2">Response Data:</h4>
-                  <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto text-xs font-mono">
-                    {formatJson(transaction.responses.step1)}
-                  </pre>
+                <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+                  {/* Toggle Buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowRequestData(prev => ({ ...prev, 1: false })); }}
+                      className={`px-4 py-2 rounded-lg font-medium text-sm ${
+                        !showRequestData[1]
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Response
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowRequestData(prev => ({ ...prev, 1: true })); }}
+                      className={`px-4 py-2 rounded-lg font-medium text-sm ${
+                        showRequestData[1]
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Request
+                    </button>
+                  </div>
+
+                  {/* Request Data */}
+                  {showRequestData[1] && (
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Request Data:</h4>
+                      <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto text-xs font-mono max-h-96 overflow-y-auto">
+                        {formatJson(transaction.responses.step1.request || { note: "Request data not available" })}
+                      </pre>
+                    </div>
+                  )}
+
+                  {/* Response Data */}
+                  {!showRequestData[1] && (
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Response Data:</h4>
+                      <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto text-xs font-mono max-h-96 overflow-y-auto">
+                        {formatJson(transaction.responses.step1)}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -170,25 +217,64 @@ const ResultsPage = () => {
               </div>
 
               {expandedStep === 2 && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-2">Response Data:</h4>
-                  <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto text-xs font-mono">
-                    {formatJson({
-                      ...transaction.responses.step2,
-                      authentication: {
-                        ...transaction.responses.step2.authentication,
-                        redirectHtml: transaction.responses.step2.authentication?.redirectHtml 
-                          ? '[HTML Content - Hidden for brevity]' 
-                          : undefined
-                      }
-                    })}
-                  </pre>
+                <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+                  {/* Toggle Buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowRequestData(prev => ({ ...prev, 2: false })); }}
+                      className={`px-4 py-2 rounded-lg font-medium text-sm ${
+                        !showRequestData[2]
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Response
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowRequestData(prev => ({ ...prev, 2: true })); }}
+                      className={`px-4 py-2 rounded-lg font-medium text-sm ${
+                        showRequestData[2]
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Request
+                    </button>
+                  </div>
+
+                  {/* Request Data */}
+                  {showRequestData[2] && (
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Request Data:</h4>
+                      <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto text-xs font-mono max-h-96 overflow-y-auto">
+                        {formatJson(transaction.responses.step2.request || { note: "Request data not available" })}
+                      </pre>
+                    </div>
+                  )}
+
+                  {/* Response Data */}
+                  {!showRequestData[2] && (
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Response Data:</h4>
+                      <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto text-xs font-mono max-h-96 overflow-y-auto">
+                        {formatJson({
+                          ...transaction.responses.step2,
+                          authentication: {
+                            ...transaction.responses.step2.authentication,
+                            redirectHtml: transaction.responses.step2.authentication?.redirectHtml 
+                              ? '[HTML Content - Hidden for brevity]' 
+                              : undefined
+                          }
+                        })}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
 
-          {/* Step 3 Results */}
+          {/* Step 3 Results - Retrieve Order Details (NEW) */}
           {transaction.responses.step3 && (
             <div className="card">
               <div
@@ -199,12 +285,12 @@ const ResultsPage = () => {
                   <div className="step-indicator completed">3</div>
                   <div>
                     <h3 className="text-lg font-bold text-gray-900">
-                      Step 3: Authorize/Pay
+                      Step 3: Retrieve Order Details
                     </h3>
                     <p className="text-sm text-gray-600">
-                      Result: {transaction.responses.step3.result}
+                      Order Status: {transaction.responses.step3.status || 'N/A'}
                       {' | '}
-                      Gateway Code: {transaction.responses.step3.response?.gatewayCode}
+                      Optional Step
                     </p>
                   </div>
                 </div>
@@ -214,11 +300,127 @@ const ResultsPage = () => {
               </div>
 
               {expandedStep === 3 && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-2">Response Data:</h4>
-                  <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto text-xs font-mono">
-                    {formatJson(transaction.responses.step3)}
-                  </pre>
+                <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+                  {/* Toggle Buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowRequestData(prev => ({ ...prev, 3: false })); }}
+                      className={`px-4 py-2 rounded-lg font-medium text-sm ${
+                        !showRequestData[3]
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Response
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowRequestData(prev => ({ ...prev, 3: true })); }}
+                      className={`px-4 py-2 rounded-lg font-medium text-sm ${
+                        showRequestData[3]
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Request
+                    </button>
+                  </div>
+
+                  {/* Request Data */}
+                  {showRequestData[3] && (
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Request Data:</h4>
+                      <div className="bg-gray-50 p-4 rounded-lg text-sm">
+                        <p className="text-gray-700 mb-2"><strong>Method:</strong> GET</p>
+                        <p className="text-gray-700 mb-2"><strong>URL:</strong> <span className="font-mono text-xs break-all">{transaction.responses.step3.request?.url || "N/A"}</span></p>
+                        <p className="text-gray-600 italic">No request body for GET requests</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Response Data */}
+                  {!showRequestData[3] && (
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Response Data:</h4>
+                      <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto text-xs font-mono max-h-96 overflow-y-auto">
+                        {formatJson(transaction.responses.step3)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 4 Results - Authorize/Pay (Previously Step 3) */}
+          {transaction.responses.step4 && (
+            <div className="card">
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => setExpandedStep(expandedStep === 4 ? null : 4)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="step-indicator completed">4</div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">
+                      Step 4: Authorize/Pay
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Result: {transaction.responses.step4.result}
+                      {' | '}
+                      Gateway Code: {transaction.responses.step4.response?.gatewayCode}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-2xl text-gray-400">
+                  {expandedStep === 4 ? '▼' : '▶'}
+                </span>
+              </div>
+
+              {expandedStep === 4 && (
+                <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+                  {/* Toggle Buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowRequestData(prev => ({ ...prev, 4: false })); }}
+                      className={`px-4 py-2 rounded-lg font-medium text-sm ${
+                        !showRequestData[4]
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Response
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowRequestData(prev => ({ ...prev, 4: true })); }}
+                      className={`px-4 py-2 rounded-lg font-medium text-sm ${
+                        showRequestData[4]
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Request
+                    </button>
+                  </div>
+
+                  {/* Request Data */}
+                  {showRequestData[4] && (
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Request Data:</h4>
+                      <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto text-xs font-mono max-h-96 overflow-y-auto">
+                        {formatJson(transaction.responses.step4.request || { note: "Request data not available" })}
+                      </pre>
+                    </div>
+                  )}
+
+                  {/* Response Data */}
+                  {!showRequestData[4] && (
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Response Data:</h4>
+                      <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto text-xs font-mono max-h-96 overflow-y-auto">
+                        {formatJson(transaction.responses.step4)}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
