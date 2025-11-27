@@ -31,6 +31,7 @@ const TestPage = () => {
   const [step2Body, setStep2Body] = useState('');
   const [step2Response, setStep2Response] = useState(null);
   const [step2BodyError, setStep2BodyError] = useState(null);
+  const [step2Required, setStep2Required] = useState(true); // NEW: Track if Step 2 is required
 
   // Step 3 State (NEW - Retrieve Order Details)
   const [step3Method, setStep3Method] = useState('GET');
@@ -214,6 +215,7 @@ const TestPage = () => {
     setStep2Response(null);
     setStep3Response(null);
     setStep4Response(null);
+    setStep2Required(true); // Reset Step 2 requirement
 
     addActivityLog('info', `Regenerated IDs: ${newOrderId} / ${newTransactionId}`);
   };
@@ -266,10 +268,39 @@ const TestPage = () => {
 
       if (response.data.success) {
         setStep1Response(response.data);
+        
+        // NEW: Check if Step 2 is required based on authentication status
+        const authStatus = response.data.authenticationStatus;
+        const shouldExecuteStep2 = response.data.step2Required;
+        const step2Decision = response.data.step2Decision;
+
+        setStep2Required(shouldExecuteStep2);
+
         addActivityLog('success', 'Step 1 completed successfully', {
-          authenticationStatus: response.data.authenticationStatus,
-          gatewayRecommendation: response.data.gatewayRecommendation
+          authenticationStatus: authStatus,
+          gatewayRecommendation: response.data.gatewayRecommendation,
+          step2Required: shouldExecuteStep2,
+          reason: step2Decision?.reason
         });
+
+        // Log the decision about Step 2
+        if (step2Decision?.shouldStop) {
+          addActivityLog('error', `🛑 ${step2Decision.reason}`, { 
+            authStatus,
+            action: 'STOP - Do not proceed with payment'
+          });
+          setError(`Authentication failed: ${step2Decision.reason}`);
+        } else if (!shouldExecuteStep2) {
+          addActivityLog('info', `ℹ️ ${step2Decision.reason}`, { 
+            authStatus,
+            action: 'Skip Step 2, proceed directly to Step 4 (PAY)'
+          });
+        } else {
+          addActivityLog('info', `ℹ️ ${step2Decision.reason}`, { 
+            authStatus,
+            action: 'Execute Step 2 (AUTHENTICATE_PAYER)'
+          });
+        }
 
         updateTransaction({
           currentStep: 1,
@@ -314,6 +345,13 @@ const TestPage = () => {
 
     if (!step1Response || !step1Response.success) {
       setError('Please complete Step 1 first');
+      return;
+    }
+
+    // NEW: Check if Step 2 should be executed
+    if (!step2Required) {
+      addActivityLog('warning', 'Step 2 is not required based on authentication status - skipping');
+      setError('Step 2 is not required for this transaction. Please proceed to Step 3 or Step 4.');
       return;
     }
 
@@ -412,8 +450,15 @@ const TestPage = () => {
 
   // Execute Step 3 (NEW - Retrieve Order Details)
   const executeStep3 = async () => {
-    if (!step2Response || !step2Response.success) {
-      setError('Please complete Step 2 first');
+    // NEW: Allow Step 3 to be executed after Step 1 if Step 2 is not required
+    const canExecute = step1Response?.success && (step2Required ? step2Response?.success : true);
+    
+    if (!canExecute) {
+      if (!step1Response?.success) {
+        setError('Please complete Step 1 first');
+      } else if (step2Required && !step2Response?.success) {
+        setError('Please complete Step 2 first (required for this transaction)');
+      }
       return;
     }
 
@@ -451,7 +496,7 @@ const TestPage = () => {
           currentStep: 3,
           responses: {
             step1: step1Response.data,
-            step2: step2Response.data,
+            step2: step2Response?.data || null,
             step3: {
               ...response.data.data,
               request: {
@@ -487,8 +532,15 @@ const TestPage = () => {
     }
     setStep4BodyError(null);
 
-    if (!step2Response || !step2Response.success) {
-      setError('Please complete Step 2 first');
+    // NEW: Allow Step 4 to be executed after Step 1 if Step 2 is not required
+    const canExecute = step1Response?.success && (step2Required ? step2Response?.success : true);
+    
+    if (!canExecute) {
+      if (!step1Response?.success) {
+        setError('Please complete Step 1 first');
+      } else if (step2Required && !step2Response?.success) {
+        setError('Please complete Step 2 first (required for this transaction)');
+      }
       return;
     }
 
@@ -541,8 +593,8 @@ const TestPage = () => {
           currentStep: 4,
           responses: {
             step1: step1Response.data,
-            step2: step2Response.data,
-            step3: step3Response?.data,
+            step2: step2Response?.data || null,
+            step3: step3Response?.data || null,
             step4: {
               ...response.data.data,
               request: {
@@ -577,6 +629,7 @@ const TestPage = () => {
     initializeStep1(orderId, transactionId);
     setStep1Response(null);
     setStep1BodyError(null);
+    setStep2Required(true); // Reset Step 2 requirement
     addActivityLog('info', 'Step 1 reset to default values');
   };
 
@@ -748,6 +801,24 @@ const TestPage = () => {
               <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto text-xs font-mono max-h-64 overflow-y-auto border border-gray-200">
                 {JSON.stringify(step1Response, null, 2)}
               </pre>
+              
+              {/* NEW: Display Step 2 requirement info */}
+              {step1Response.success && step1Response.step2Decision && (
+                <div className={`mt-3 p-3 rounded-lg border ${
+                  step1Response.step2Decision.shouldStop 
+                    ? 'bg-red-50 border-red-200 text-red-800' 
+                    : step2Required 
+                      ? 'bg-blue-50 border-blue-200 text-blue-800'
+                      : 'bg-amber-50 border-amber-200 text-amber-800'
+                }`}>
+                  <p className="text-sm font-medium">
+                    {step1Response.step2Decision.shouldStop && '🛑 '}
+                    {step2Required && !step1Response.step2Decision.shouldStop && 'ℹ️ '}
+                    {!step2Required && !step1Response.step2Decision.shouldStop && '⏭️ '}
+                    {step1Response.step2Decision.reason}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -767,10 +838,15 @@ const TestPage = () => {
         </div>
 
         {/* Step 2: Authenticate Payer */}
-        <div className="card mb-6">
+        <div className={`card mb-6 ${!step2Required ? 'opacity-60' : ''}`}>
           <div className="flex items-center gap-3 mb-4">
-            <div className={`step-indicator ${step2Response?.success ? 'completed' : step1Response?.success ? 'active' : 'pending'}`}>2</div>
+            <div className={`step-indicator ${step2Response?.success ? 'completed' : (step1Response?.success && step2Required) ? 'active' : 'pending'}`}>2</div>
             <h2 className="text-xl font-bold text-gray-900">Step 2: Authenticate Payer</h2>
+            {!step2Required && step1Response?.success && (
+              <span className="text-sm px-3 py-1 bg-amber-100 text-amber-800 rounded-full font-medium">
+                ⏭️ Skipped (Not Required)
+              </span>
+            )}
           </div>
 
           {/* Method & URL */}
@@ -781,6 +857,7 @@ const TestPage = () => {
               onChange={(e) => setStep2Method(e.target.value.toUpperCase())}
               className="px-4 py-2 border border-gray-300 rounded-lg font-semibold bg-white w-24 text-center"
               placeholder="PUT"
+              disabled={!step2Required}
             />
             <input
               type="text"
@@ -788,6 +865,7 @@ const TestPage = () => {
               onChange={(e) => setStep2Url(e.target.value)}
               className="input-field flex-1 font-mono text-sm"
               placeholder="API URL"
+              disabled={!step2Required}
             />
           </div>
 
@@ -801,6 +879,7 @@ const TestPage = () => {
                 setStep2BodyError(validateJSON(e.target.value));
               }}
               className={`w-full h-64 px-4 py-2 border ${step2BodyError ? 'border-error-500' : 'border-gray-300'} rounded-lg font-mono text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent`}
+              disabled={!step2Required}
             />
             {step2BodyError && (
               <p className="text-xs text-error-600 mt-1">❌ Invalid JSON: {step2BodyError}</p>
@@ -821,12 +900,12 @@ const TestPage = () => {
 
           {/* Actions */}
           <div className="flex gap-3">
-            <button onClick={resetStep2} className="btn-secondary">
+            <button onClick={resetStep2} className="btn-secondary" disabled={!step2Required}>
               🔄 Reset to Default
             </button>
             <button
               onClick={executeStep2}
-              disabled={loading.step2 || !step1Response?.success || step2BodyError}
+              disabled={loading.step2 || !step1Response?.success || step2BodyError || !step2Required}
               className="btn-primary flex-1"
             >
               {loading.step2 ? '⏳ Executing...' : '🚀 Execute Step 2'}
@@ -837,7 +916,13 @@ const TestPage = () => {
         {/* Step 3: Retrieve Order Details (NEW) */}
         <div className="card mb-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className={`step-indicator ${step3Response?.success ? 'completed' : step2Response?.success ? 'active' : 'pending'}`}>3</div>
+            <div className={`step-indicator ${
+              step3Response?.success 
+                ? 'completed' 
+                : (step1Response?.success && (step2Required ? step2Response?.success : true))
+                  ? 'active' 
+                  : 'pending'
+            }`}>3</div>
             <h2 className="text-xl font-bold text-gray-900">Step 3: Retrieve Order Details</h2>
             <span className="text-sm text-gray-500 italic">(Optional)</span>
           </div>
@@ -886,7 +971,7 @@ const TestPage = () => {
             </button>
             <button
               onClick={executeStep3}
-              disabled={loading.step3 || !step2Response?.success}
+              disabled={loading.step3 || !step1Response?.success || (step2Required && !step2Response?.success)}
               className="btn-primary flex-1"
             >
               {loading.step3 ? '⏳ Executing...' : '🚀 Execute Step 3'}
@@ -897,7 +982,13 @@ const TestPage = () => {
         {/* Step 4: Authorize/Pay (previously Step 3) */}
         <div className="card mb-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className={`step-indicator ${step4Response?.success ? 'completed' : step2Response?.success ? 'active' : 'pending'}`}>4</div>
+            <div className={`step-indicator ${
+              step4Response?.success 
+                ? 'completed' 
+                : (step1Response?.success && (step2Required ? step2Response?.success : true))
+                  ? 'active' 
+                  : 'pending'
+            }`}>4</div>
             <h2 className="text-xl font-bold text-gray-900">Step 4: Authorize/Pay</h2>
           </div>
 
@@ -954,7 +1045,7 @@ const TestPage = () => {
             </button>
             <button
               onClick={executeStep4}
-              disabled={loading.step4 || !step2Response?.success || step4BodyError}
+              disabled={loading.step4 || !step1Response?.success || (step2Required && !step2Response?.success) || step4BodyError}
               className="btn-primary flex-1"
             >
               {loading.step4 ? '⏳ Executing...' : '🚀 Execute Step 4'}
