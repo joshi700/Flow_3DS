@@ -274,7 +274,14 @@ const TestPage = () => {
         const shouldExecuteStep2 = response.data.step2Required;
         const step2Decision = response.data.step2Decision;
 
+        console.log('🔍 DEBUG [Step 1] - Auth Status:', authStatus);
+        console.log('🔍 DEBUG [Step 1] - Should Execute Step 2:', shouldExecuteStep2);
+        console.log('🔍 DEBUG [Step 1] - Step 2 Decision:', step2Decision);
+        console.log('🔍 DEBUG [Step 1] - Full Response:', response.data);
+
         setStep2Required(shouldExecuteStep2);
+        
+        console.log('🔍 DEBUG [Step 1] - step2Required state set to:', shouldExecuteStep2);
 
         addActivityLog('success', 'Step 1 completed successfully', {
           authenticationStatus: authStatus,
@@ -336,6 +343,10 @@ const TestPage = () => {
 
   // Execute Step 2
   const executeStep2 = async () => {
+    console.log('🔍 DEBUG [Step 2] - Function called');
+    console.log('🔍 DEBUG [Step 2] - step2Required state:', step2Required);
+    console.log('🔍 DEBUG [Step 2] - step1Response:', step1Response);
+    
     const bodyError = validateJSON(step2Body);
     if (bodyError) {
       setStep2BodyError(bodyError);
@@ -349,11 +360,15 @@ const TestPage = () => {
     }
 
     // NEW: Check if Step 2 should be executed
+    console.log('🔍 DEBUG [Step 2] - Checking if Step 2 required');
+    console.log('🔍 DEBUG [Step 2] - step2Required value:', step2Required);
     if (!step2Required) {
+      console.log('🔍 DEBUG [Step 2] - BLOCKING Step 2 execution - not required');
       addActivityLog('warning', 'Step 2 is not required based on authentication status - skipping');
       setError('Step 2 is not required for this transaction. Please proceed to Step 3 or Step 4.');
       return;
     }
+    console.log('🔍 DEBUG [Step 2] - Step 2 IS required - proceeding');
 
     setLoading(prev => ({ ...prev, step2: true }));
     setError(null);
