@@ -279,7 +279,14 @@ const TestPage = () => {
         console.log('🔍 DEBUG [Step 1] - Step 2 Decision:', step2Decision);
         console.log('🔍 DEBUG [Step 1] - Full Response:', response.data);
 
+        console.log('🔍 DEBUG [Step 1] - BEFORE setState - step2Required current value:', step2Required);
         setStep2Required(shouldExecuteStep2);
+        console.log('🔍 DEBUG [Step 1] - AFTER setState (immediate) - setting to:', shouldExecuteStep2);
+        
+        // Check after a brief delay to see if state actually updated
+        setTimeout(() => {
+          console.log('🔍 DEBUG [Step 1] - AFTER setState (delayed 100ms) - step2Required should now be:', shouldExecuteStep2);
+        }, 100);
         
         console.log('🔍 DEBUG [Step 1] - step2Required state set to:', shouldExecuteStep2);
 
@@ -862,6 +869,10 @@ const TestPage = () => {
                 ⏭️ Skipped (Not Required)
               </span>
             )}
+            {/* DEBUG: Show current step2Required state */}
+            <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded font-mono ml-auto">
+              step2Required: {step2Required ? 'true' : 'false'}
+            </span>
           </div>
 
           {/* Method & URL */}
