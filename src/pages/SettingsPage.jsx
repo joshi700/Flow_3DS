@@ -12,7 +12,15 @@ const SettingsPage = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   const handleConfigChange = (field, value) => {
-    updateConfig({ [field]: value });
+    // Auto-update API Username when Merchant ID changes
+    if (field === 'merchantId') {
+      updateConfig({ 
+        merchantId: value,
+        username: value ? `merchant.${value}` : ''
+      });
+    } else {
+      updateConfig({ [field]: value });
+    }
   };
 
   const handleTestCardChange = (field, value) => {
@@ -151,15 +159,19 @@ const SettingsPage = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  API Username *
+                  API Username * <span className="text-xs text-gray-500">(Auto-generated)</span>
                 </label>
                 <input
                   type="text"
-                  className="input-field"
+                  className="input-field bg-gray-50 cursor-not-allowed"
                   placeholder="merchant.{merchantId}"
                   value={config.username}
-                  onChange={(e) => handleConfigChange('username', e.target.value)}
+                  readOnly
+                  title="This field is automatically generated from the Merchant ID"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Format: merchant.{config.merchantId || 'MERCHANTID'}
+                </p>
               </div>
             </div>
 
